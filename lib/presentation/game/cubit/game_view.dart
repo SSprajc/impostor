@@ -5,6 +5,7 @@ import 'package:impostor/presentation/common/impostor_theme.dart';
 import 'package:impostor/presentation/game/cubit/game_cubit.dart';
 import 'package:impostor/presentation/game/widget/game_dialogs.dart';
 import 'package:impostor/presentation/game/widget/game_widgets.dart';
+import 'package:impostor/presentation/game/widget/loading_view.dart';
 
 class GameView extends StatelessWidget {
   const GameView({super.key});
@@ -41,6 +42,7 @@ class GameView extends StatelessWidget {
         builder: (context, state) {
           return switch (state) {
             GameInitial() => const NoPlayersWidget(),
+            GameInProgress(phase: GamePhase.loading) => const LoadingView(),
             GameInProgress() => PlayerGrid(
               gameInProgressState: state,
               onCardClick: (index) {
