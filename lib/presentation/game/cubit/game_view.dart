@@ -45,8 +45,6 @@ class GameView extends StatelessWidget {
         listener: (context, state) {
           if (state is GameInProgress && state.dialogRequest != null) {
             _handleDialogRequest(context, state.dialogRequest!);
-          } else if (state is GameInProgress ) {
-
           }
         },
         builder: (context, state) {

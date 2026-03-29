@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:bloc/bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:impostor/domain/model/game_phase.dart';
 import 'package:impostor/domain/model/player.dart';
