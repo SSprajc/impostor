@@ -6,7 +6,7 @@ import 'package:impostor/domain/model/game_phase.dart';
 import 'package:impostor/domain/model/player.dart';
 import 'package:impostor/domain/model/word_pair.dart';
 import 'package:impostor/domain/service/word_service.dart';
-import 'package:meta/meta.dart';
+import 'package:flutter/foundation.dart';
 
 part 'game_state.dart';
 
