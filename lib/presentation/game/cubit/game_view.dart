@@ -194,6 +194,7 @@ void _showQualityCheckDialog(BuildContext context) {
 void _showGenerationErrorDialog(BuildContext context) {
   showDialog(
     context: context,
+    barrierDismissible: false,
     builder: (_) => GenerationErrorDialog(
       onRetry: () => context.read<GameCubit>().startGame(),
     ),

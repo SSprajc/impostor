@@ -264,7 +264,7 @@ class NonEndingEliminationDialog extends StatelessWidget {
           onPressed: () {
             Navigator.of(context).pop();
           },
-          child: const Text(''),
+          child: const Text('Continue'),
         ),
       ],
     );
