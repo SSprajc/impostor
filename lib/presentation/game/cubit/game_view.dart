@@ -53,6 +53,9 @@ class GameView extends StatelessWidget {
                     break;
                 }
               },
+              onCardLongPress: (index) {
+                gameCubit.requestRemovePlayer(index);
+              },
             ),
           };
         },
