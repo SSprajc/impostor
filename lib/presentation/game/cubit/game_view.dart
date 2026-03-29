@@ -15,7 +15,17 @@ class GameView extends StatelessWidget {
     final state = context.watch<GameCubit>().state;
     final gameCubit = context.read<GameCubit>();
 
-    return Scaffold(
+    final isActiveRound = state is GameInProgress &&
+        state.phase != GamePhase.addingPlayers;
+
+    return PopScope(
+      canPop: !isActiveRound,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && isActiveRound) {
+          gameCubit.requestAbandonRound();
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         actions: [
           if (state is GameInProgress &&
@@ -75,6 +85,7 @@ class GameView extends StatelessWidget {
               child: const Icon(Icons.add),
             )
           : null,
+      ),
     );
   }
 }
