@@ -83,24 +83,24 @@ void _handleDialogRequest(BuildContext context, DialogRequest request) {
   switch (request) {
     case AddPlayerDialogRequest():
       _showAddPlayerDialog(context);
+    case RemovePlayerDialogRequest():
+      _showRemovePlayerDialog(context, request);
     case ShowWordDialogRequest():
       _showWordDialog(context, request);
+    case InsidiousImpostorRevealDialogRequest():
+      _showInsidiousImpostorRevealDialog(context, request);
     case ConfirmEliminationDialogRequest():
       _showConfirmEliminationDialog(context, request);
     case NonEndingEliminationDialogRequest():
       _showNonEndingEliminationDialog(context, request);
-    case RemovePlayerDialogRequest():
-      break; // wired in Task 6
-    case InsidiousImpostorRevealDialogRequest():
-      break; // wired in Task 8
     case RoundResultDialogRequest():
-      break; // wired in Task 8
+      _showRoundResultDialog(context, request);
     case QualityCheckDialogRequest():
-      break; // wired in Task 8
+      _showQualityCheckDialog(context);
     case GenerationErrorDialogRequest():
-      break; // wired in Task 8
+      _showGenerationErrorDialog(context);
     case AbandonRoundDialogRequest():
-      break; // wired in Task 9
+      _showAbandonRoundDialog(context);
   }
 }
 
@@ -108,51 +108,104 @@ void _showAddPlayerDialog(BuildContext context) {
   showDialog(
     context: context,
     builder: (_) => AddPlayerDialog(
-      onAdd: (name) {
-        context.read<GameCubit>().addPlayer(name);
-      },
-      onCancel: () {
-        context.read<GameCubit>().clearDialog();
-      },
+      onAdd: (name) => context.read<GameCubit>().addPlayer(name),
+      onCancel: () => context.read<GameCubit>().clearDialog(),
     ),
   );
 }
 
-void _showWordDialog(
-  BuildContext context,
-  ShowWordDialogRequest request,
-) async {
+void _showRemovePlayerDialog(BuildContext context, RemovePlayerDialogRequest request) {
+  showDialog(
+    context: context,
+    builder: (_) => RemovePlayerDialog(
+      playerName: request.playerName,
+      onConfirm: () => context.read<GameCubit>().removePlayer(request.playerIndex),
+      onCancel: () => context.read<GameCubit>().clearDialog(),
+    ),
+  );
+}
+
+void _showWordDialog(BuildContext context, ShowWordDialogRequest request) async {
   final cubit = context.read<GameCubit>();
+  final playerName = (cubit.state as GameInProgress).players[request.index].name;
   await showDialog(
     context: context,
-    builder: (_) => ShowWordDialog(text: request.word),
+    barrierDismissible: false,
+    builder: (_) => ShowWordDialog(text: request.word, playerName: playerName),
   );
   cubit.confirmWordSeen(request.index);
 }
 
-void _showConfirmEliminationDialog(
-  BuildContext context,
-  ConfirmEliminationDialogRequest request,
-) {
+void _showInsidiousImpostorRevealDialog(BuildContext context, InsidiousImpostorRevealDialogRequest request) {
+  final cubit = context.read<GameCubit>();
+  final playerName = (cubit.state as GameInProgress).players[request.playerIndex].name;
   showDialog(
     context: context,
-    builder: (dialogContext) => ConfirmEliminationDialog(
-      playerName: request.playerName,
-      onConfirm: () {
-        context.read<GameCubit>().confirmElimination(request.playerIndex);
-      },
+    barrierDismissible: false,
+    builder: (_) => InsidiousImpostorRevealDialog(
+      playerName: playerName,
+      onClose: () => cubit.confirmWordSeen(request.playerIndex),
     ),
   );
 }
 
-void _showNonEndingEliminationDialog(
-  BuildContext context,
-  NonEndingEliminationDialogRequest request,
-) async {
+void _showConfirmEliminationDialog(BuildContext context, ConfirmEliminationDialogRequest request) {
+  showDialog(
+    context: context,
+    builder: (_) => ConfirmEliminationDialog(
+      playerName: request.playerName,
+      onConfirm: () => context.read<GameCubit>().confirmElimination(request.playerIndex),
+    ),
+  );
+}
+
+void _showNonEndingEliminationDialog(BuildContext context, NonEndingEliminationDialogRequest request) async {
   final cubit = context.read<GameCubit>();
   await showDialog(
     context: context,
     builder: (_) => NonEndingEliminationDialog(playerName: request.playerName),
   );
   cubit.clearDialog();
+}
+
+void _showRoundResultDialog(BuildContext context, RoundResultDialogRequest request) {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => RoundResultDialog(
+      message: request.message,
+      players: request.players,
+      onDismiss: () => context.read<GameCubit>().dismissRoundResult(),
+    ),
+  );
+}
+
+void _showQualityCheckDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => QualityCheckDialog(
+      onGood: () => context.read<GameCubit>().submitQualityCheck(isGood: true),
+      onBad: () => context.read<GameCubit>().submitQualityCheck(isGood: false),
+    ),
+  );
+}
+
+void _showGenerationErrorDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (_) => GenerationErrorDialog(
+      onRetry: () => context.read<GameCubit>().startGame(),
+    ),
+  );
+}
+
+void _showAbandonRoundDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (_) => AbandonRoundDialog(
+      onConfirm: () => context.read<GameCubit>().abandonRound(),
+      onCancel: () => context.read<GameCubit>().clearDialog(),
+    ),
+  );
 }
