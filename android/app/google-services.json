@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "395381801854",
+    "project_id": "impostor-ae1ab",
+    "storage_bucket": "impostor-ae1ab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:395381801854:android:b3dfff93d4c371ed2d692f",
+        "android_client_info": {
+          "package_name": "hr.sandro.impostor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmGL3Q2Nyz8frEcIyI7Yrfo8Y_Hp1CZog"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,61 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:impostor/presentation/common/impostor_theme.dart';
-import 'package:impostor/presentation/common_widgets.dart';
+import 'package:impostor/presentation/common/primary_button.dart';
 import 'package:impostor/presentation/game/cubit/game_cubit.dart';
-import 'package:impostor/presentation/game/cubit/game_view.dart';
+import 'package:impostor/presentation/game/game_view.dart';
 
 class MenuView extends StatelessWidget {
   const MenuView({super.key});
 
+  void _startGame(BuildContext context, {required bool isClueless}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) => GameCubit(isClueless: isClueless),
+          child: const GameView(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final themeData = ImpTheme.themeData;
-    
     return Scaffold(
-      backgroundColor: Colors.black12,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
+      body: Container(
+        decoration: ImpTheme.vignette(),
+        child: SafeArea(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              Spacer(flex: 1),
-              Text(
-                "Impostor",
-                style: themeData.textTheme.headlineLarge,
-              ),
-              Spacer(flex: 3),
-              PrimaryButton(
-                mainText: 'Clueless',
-                subText: 'Impostor doesn\'t know he is the Impostor',
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BlocProvider(
-                        create: (_) => GameCubit(isClueless: true),
-                        child: GameView(),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Impostor',
+                        style: Theme.of(context)
+                            .textTheme
+                            .displayLarge
+                            ?.copyWith(shadows: ImpTheme.glow()),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-              const SizedBox(height: 24),
-              PrimaryButton(
-                mainText: 'Insidious',
-                subText: 'Knows what he\'s doing',
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BlocProvider(
-                        create: (_) => GameCubit(isClueless: false),
-                        child: const GameView(),
-                      ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 56),
+                child: Column(
+                  children: [
+                    PrimaryButton(
+                      mainText: 'Clueless',
+                      subText: "Impostor doesn't know he is the Impostor",
+                      onPressed: () => _startGame(context, isClueless: true),
                     ),
-                  );
-                },
+                    const SizedBox(height: 16),
+                    PrimaryButton(
+                      mainText: 'Insidious',
+                      subText: "Knows what he's doing",
+                      onPressed: () => _startGame(context, isClueless: false),
+                    ),
+                  ],
+                ),
               ),
-              Spacer(flex: 6),
             ],
           ),
         ),

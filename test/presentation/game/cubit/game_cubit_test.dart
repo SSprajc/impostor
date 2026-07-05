@@ -1,28 +1,48 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:impostor/domain/model/game_phase.dart';
 import 'package:impostor/domain/model/player.dart';
+import 'package:impostor/domain/model/word_pair.dart';
 import 'package:impostor/domain/service/mock_word_service.dart';
+import 'package:impostor/domain/service/round_feedback_service.dart';
+import 'package:impostor/domain/service/word_service.dart';
 import 'package:impostor/presentation/game/cubit/game_cubit.dart';
 
-GameCubit _cubit({bool isClueless = true}) =>
-    GameCubit(isClueless: isClueless, wordService: MockWordService());
+class _FakeRoundFeedbackService implements RoundFeedbackService {
+  @override
+  Future<void> saveApprovedWordPair({
+    required WordPair wordPair,
+    required String gameMode,
+  }) async {}
+}
+
+class _ControlledWordService implements WordService {
+  final completer = Completer<WordPair>();
+
+  @override
+  Future<WordPair> generateWordPair() => completer.future;
+}
+
+GameCubit _cubit({bool isClueless = true, WordService? wordService}) =>
+    GameCubit(
+      isClueless: isClueless,
+      wordService: wordService ?? MockWordService(),
+      roundFeedbackService: _FakeRoundFeedbackService(),
+    );
 
 void main() {
   group('removePlayer', () {
     blocTest<GameCubit, GameState>(
       'removes player by index during addingPlayers phase',
       build: _cubit,
-      seed: () => GameInProgress(
-        players: [
-          Player.firstCreate(name: 'Alice'),
-          Player.firstCreate(name: 'Bob'),
-        ],
-        phase: GamePhase.addingPlayers,
+      seed: () => const GameState(
+        players: [Player(name: 'Alice'), Player(name: 'Bob')],
       ),
       act: (cubit) => cubit.removePlayer(0),
       expect: () => [
-        isA<GameInProgress>().having(
+        isA<GameState>().having(
           (s) => s.players.map((p) => p.name).toList(),
           'players',
           ['Bob'],
@@ -35,36 +55,33 @@ void main() {
     blocTest<GameCubit, GameState>(
       'emits loading then dealingWords with word pair assigned',
       build: _cubit,
-      seed: () => GameInProgress(
+      seed: () => const GameState(
         players: [
-          Player.firstCreate(name: 'Alice'),
-          Player.firstCreate(name: 'Bob'),
-          Player.firstCreate(name: 'Carol'),
+          Player(name: 'Alice'),
+          Player(name: 'Bob'),
+          Player(name: 'Carol'),
         ],
-        phase: GamePhase.addingPlayers,
       ),
       act: (cubit) => cubit.startGame(),
       expect: () => [
-        isA<GameInProgress>().having((s) => s.phase, 'phase', GamePhase.loading),
-        isA<GameInProgress>().having((s) => s.phase, 'phase', GamePhase.dealingWords),
+        isA<GameState>().having((s) => s.phase, 'phase', GamePhase.loading),
+        isA<GameState>().having((s) => s.phase, 'phase', GamePhase.dealingWords),
       ],
     );
 
     blocTest<GameCubit, GameState>(
       'assigns exactly one impostor',
       build: _cubit,
-      seed: () => GameInProgress(
+      seed: () => const GameState(
         players: [
-          Player.firstCreate(name: 'Alice'),
-          Player.firstCreate(name: 'Bob'),
-          Player.firstCreate(name: 'Carol'),
+          Player(name: 'Alice'),
+          Player(name: 'Bob'),
+          Player(name: 'Carol'),
         ],
-        phase: GamePhase.addingPlayers,
       ),
       act: (cubit) => cubit.startGame(),
       verify: (cubit) {
-        final state = cubit.state as GameInProgress;
-        final impostors = state.players.where((p) => p.isImpostor).length;
+        final impostors = cubit.state.players.where((p) => p.isImpostor).length;
         expect(impostors, 1);
       },
     );
@@ -72,60 +89,79 @@ void main() {
     blocTest<GameCubit, GameState>(
       'stores wordPair on state after starting',
       build: _cubit,
-      seed: () => GameInProgress(
+      seed: () => const GameState(
         players: [
-          Player.firstCreate(name: 'Alice'),
-          Player.firstCreate(name: 'Bob'),
-          Player.firstCreate(name: 'Carol'),
+          Player(name: 'Alice'),
+          Player(name: 'Bob'),
+          Player(name: 'Carol'),
         ],
-        phase: GamePhase.addingPlayers,
       ),
       act: (cubit) => cubit.startGame(),
       verify: (cubit) {
-        final state = cubit.state as GameInProgress;
-        expect(state.wordPair, isNotNull);
-        expect(state.wordPair!.civilianWord, 'Apple');
-        expect(state.wordPair!.impostorWord, 'Banana');
+        expect(cubit.state.wordPair, isNotNull);
+        expect(cubit.state.wordPair!.civilianWord, 'Apple');
+        expect(cubit.state.wordPair!.impostorWord, 'Banana');
       },
     );
+
+    test('does not enter dealingWords if round abandoned during loading',
+        () async {
+      final wordService = _ControlledWordService();
+      final cubit = _cubit(wordService: wordService);
+      cubit
+        ..addPlayer('Alice')
+        ..addPlayer('Bob')
+        ..addPlayer('Carol');
+
+      final started = cubit.startGame();
+      cubit.abandonRound();
+      wordService.completer
+          .complete(const WordPair(civilianWord: 'a', impostorWord: 'b'));
+      await started;
+
+      expect(cubit.state.phase, GamePhase.addingPlayers);
+      await cubit.close();
+    });
   });
 
   group('confirmElimination', () {
     blocTest<GameCubit, GameState>(
       'round ends when impostor is eliminated',
       build: _cubit,
-      seed: () => GameInProgress(
+      seed: () => const GameState(
         players: [
-          Player.firstCreate(name: 'Alice').copyWith(isImpostor: true, hasSeenWord: true),
-          Player.firstCreate(name: 'Bob').copyWith(hasSeenWord: true),
-          Player.firstCreate(name: 'Carol').copyWith(hasSeenWord: true),
+          Player(name: 'Alice', isImpostor: true, hasSeenWord: true),
+          Player(name: 'Bob', hasSeenWord: true),
+          Player(name: 'Carol', hasSeenWord: true),
         ],
         phase: GamePhase.voting,
       ),
       act: (cubit) => cubit.confirmElimination(0),
       expect: () => [
-        isA<GameInProgress>()
+        isA<GameState>()
             .having((s) => s.phase, 'phase', GamePhase.roundOver)
-            .having((s) => s.dialogRequest, 'dialog', isA<RoundResultDialogRequest>()),
+            .having((s) => s.dialogRequest, 'dialog',
+                isA<RoundResultDialogRequest>()),
       ],
     );
 
     blocTest<GameCubit, GameState>(
       'impostor wins when only 2 active players remain',
       build: _cubit,
-      seed: () => GameInProgress(
+      seed: () => const GameState(
         players: [
-          Player.firstCreate(name: 'Alice').copyWith(isImpostor: true, hasSeenWord: true),
-          Player.firstCreate(name: 'Bob').copyWith(hasSeenWord: true),
-          Player.firstCreate(name: 'Carol').copyWith(hasSeenWord: true),
+          Player(name: 'Alice', isImpostor: true, hasSeenWord: true),
+          Player(name: 'Bob', hasSeenWord: true),
+          Player(name: 'Carol', hasSeenWord: true),
         ],
         phase: GamePhase.voting,
       ),
-      act: (cubit) => cubit.confirmElimination(1), // eliminate non-impostor, leaving 2
+      act: (cubit) => cubit.confirmElimination(1), // non-impostor, leaving 2
       expect: () => [
-        isA<GameInProgress>()
+        isA<GameState>()
             .having((s) => s.phase, 'phase', GamePhase.roundOver)
-            .having((s) => s.players.firstWhere((p) => p.isImpostor).points, 'impostor points', 1),
+            .having((s) => s.players.firstWhere((p) => p.isImpostor).points,
+                'impostor points', 1),
       ],
     );
   });
@@ -134,36 +170,38 @@ void main() {
     blocTest<GameCubit, GameState>(
       'emits QualityCheckDialogRequest after round result dismissed',
       build: _cubit,
-      seed: () => GameInProgress(
-        players: [Player.firstCreate(name: 'Alice')],
+      seed: () => GameState(
+        players: const [Player(name: 'Alice')],
         phase: GamePhase.roundOver,
         dialogRequest: RoundResultDialogRequest(message: 'test', players: []),
       ),
       act: (cubit) => cubit.dismissRoundResult(),
       expect: () => [
-        isA<GameInProgress>()
-            .having((s) => s.dialogRequest, 'dialog', isA<QualityCheckDialogRequest>()),
+        isA<GameState>().having(
+            (s) => s.dialogRequest, 'dialog', isA<QualityCheckDialogRequest>()),
       ],
     );
   });
 
   group('submitQualityCheck', () {
     blocTest<GameCubit, GameState>(
-      'resets to addingPlayers after quality check',
+      'resets to addingPlayers after quality check, keeping names and points',
       build: _cubit,
-      seed: () => GameInProgress(
+      seed: () => const GameState(
         players: [
-          Player.firstCreate(name: 'Alice').copyWith(word: 'Apple', isImpostor: true),
-          Player.firstCreate(name: 'Bob').copyWith(word: 'Banana'),
-          Player.firstCreate(name: 'Carol').copyWith(word: 'Banana'),
+          Player(name: 'Alice', word: 'Apple', isImpostor: true, points: 2),
+          Player(name: 'Bob', word: 'Banana'),
+          Player(name: 'Carol', word: 'Banana'),
         ],
         phase: GamePhase.roundOver,
       ),
       act: (cubit) => cubit.submitQualityCheck(isGood: true),
       expect: () => [
-        isA<GameInProgress>()
+        isA<GameState>()
             .having((s) => s.phase, 'phase', GamePhase.addingPlayers)
-            .having((s) => s.players.every((p) => p.word == ''), 'words cleared', true),
+            .having((s) => s.players.every((p) => p.word == ''),
+                'words cleared', true)
+            .having((s) => s.players.first.points, 'points kept', 2),
       ],
     );
   });
@@ -171,35 +209,35 @@ void main() {
   group('Insidious mode', () {
     blocTest<GameCubit, GameState>(
       'impostor gets InsidiousImpostorRevealDialogRequest in insidious mode',
-      build: () => GameCubit(isClueless: false, wordService: MockWordService()),
-      seed: () => GameInProgress(
+      build: () => _cubit(isClueless: false),
+      seed: () => const GameState(
         players: [
-          Player.firstCreate(name: 'Alice').copyWith(word: 'Apple', isImpostor: true),
-          Player.firstCreate(name: 'Bob').copyWith(word: 'Banana'),
+          Player(name: 'Alice', word: 'Apple', isImpostor: true),
+          Player(name: 'Bob', word: 'Banana'),
         ],
         phase: GamePhase.dealingWords,
       ),
       act: (cubit) => cubit.showWord(0),
       expect: () => [
-        isA<GameInProgress>()
-            .having((s) => s.dialogRequest, 'dialog', isA<InsidiousImpostorRevealDialogRequest>()),
+        isA<GameState>().having((s) => s.dialogRequest, 'dialog',
+            isA<InsidiousImpostorRevealDialogRequest>()),
       ],
     );
 
     blocTest<GameCubit, GameState>(
       'non-impostor gets normal ShowWordDialogRequest in insidious mode',
-      build: () => GameCubit(isClueless: false, wordService: MockWordService()),
-      seed: () => GameInProgress(
+      build: () => _cubit(isClueless: false),
+      seed: () => const GameState(
         players: [
-          Player.firstCreate(name: 'Alice').copyWith(word: 'Apple', isImpostor: true),
-          Player.firstCreate(name: 'Bob').copyWith(word: 'Banana'),
+          Player(name: 'Alice', word: 'Apple', isImpostor: true),
+          Player(name: 'Bob', word: 'Banana'),
         ],
         phase: GamePhase.dealingWords,
       ),
       act: (cubit) => cubit.showWord(1),
       expect: () => [
-        isA<GameInProgress>()
-            .having((s) => s.dialogRequest, 'dialog', isA<ShowWordDialogRequest>()),
+        isA<GameState>().having(
+            (s) => s.dialogRequest, 'dialog', isA<ShowWordDialogRequest>()),
       ],
     );
   });

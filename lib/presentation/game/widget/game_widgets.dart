@@ -9,39 +9,37 @@ class NoPlayersWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.only(bottom: 94),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Text(
-                  "Add players",
-                  style: TextStyle(
-                    fontSize: 42,
-                    letterSpacing: 2,
-                    fontFamily: 'Bloodthirsty',
-                    color: ImpColors.secondary,
-                  ),
-                ),
+          'Add players',
+          textAlign: TextAlign.center,
+          style: Theme.of(context)
+              .textTheme
+              .displaySmall
+              ?.copyWith(fontSize: 30, color: ImpColors.ash),
+        ),
       ),
     );
   }
 }
 
-
 class PlayerGrid extends StatelessWidget {
-  final GameInProgress gameInProgressState;
+  final GameState state;
   final void Function(int index) onCardClick;
   final void Function(int index)? onCardLongPress;
 
   const PlayerGrid({
     super.key,
-    required this.gameInProgressState,
+    required this.state,
     required this.onCardClick,
     this.onCardLongPress,
   });
 
   bool _isClickable(int index) {
-    final player = gameInProgressState.players[index];
-    switch (gameInProgressState.phase) {
+    final player = state.players[index];
+    switch (state.phase) {
       case GamePhase.dealingWords:
         return !player.hasSeenWord;
       case GamePhase.voting:
@@ -57,21 +55,21 @@ class PlayerGrid extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.5,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        mainAxisExtent: 104,
       ),
-      itemCount: gameInProgressState.players.length,
+      itemCount: state.players.length,
       itemBuilder: (context, index) {
-        final player = gameInProgressState.players[index];
+        final player = state.players[index];
         final isClickable = _isClickable(index);
 
         return PlayerCard(
           player: player,
           isClickable: isClickable,
-          phase: gameInProgressState.phase,
+          phase: state.phase,
           onTap: isClickable ? () => onCardClick(index) : null,
-          onLongPress: gameInProgressState.phase == GamePhase.addingPlayers
+          onLongPress: state.phase == GamePhase.addingPlayers
               ? () => onCardLongPress?.call(index)
               : null,
         );
@@ -99,34 +97,64 @@ class PlayerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    final showSeenCheck = phase == GamePhase.dealingWords && player.hasSeenWord;
+    final isSeen = phase == GamePhase.dealingWords && player.hasSeenWord;
+    final isDead = player.isEliminated;
 
-    return Card(
-      color: isClickable
-          ? ImpColors.onTertiaryColor
-          : ImpColors.tertiaryColor,
+    return Material(
+      color: isDead ? ImpColors.deadSurface : ImpColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(
+          color: isDead
+              ? ImpColors.deadBorder
+              : isSeen
+                  ? ImpColors.borderSeen
+                  : ImpColors.border,
+          width: 1,
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(4),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Center(
+            if (isDead)
+              Text(
+                '✕',
+                style: TextStyle(
+                  fontFamily: ImpFonts.body,
+                  fontSize: 64,
+                  height: 1,
+                  color: ImpColors.blood.withValues(alpha: .16),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
                 player.name,
-                style: theme.bodyLarge,
                 textAlign: TextAlign.center,
+                style: theme.bodyLarge?.copyWith(
+                  fontSize: 21,
+                  color: isDead ? ImpColors.deadText : ImpColors.bone,
+                  decoration: isDead ? TextDecoration.lineThrough : null,
+                  decorationColor: ImpColors.deadText,
+                ),
               ),
             ),
-            if (showSeenCheck)
-              Positioned(
+            if (isSeen)
+              const Positioned(
                 top: 6,
-                right: 8,
-                child: Icon(
-                  Icons.check_circle,
-                  color: ImpColors.accent,
-                  size: 18,
+                right: 12,
+                child: Text(
+                  '†',
+                  style: TextStyle(
+                    fontFamily: ImpFonts.body,
+                    fontSize: 24,
+                    height: 1,
+                    color: ImpColors.blood,
+                  ),
                 ),
               ),
           ],

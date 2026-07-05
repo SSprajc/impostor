@@ -2,6 +2,74 @@ import 'package:flutter/material.dart';
 import 'package:impostor/domain/model/player.dart';
 import 'package:impostor/presentation/common/impostor_theme.dart';
 
+/// Right-aligned dialog action row: quiet cancel + filled confirm, gap 24.
+List<Widget> _actionRow({Widget? cancel, required Widget confirm}) => [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          if (cancel != null) ...[cancel, const SizedBox(width: 24)],
+          confirm,
+        ],
+      ),
+    ];
+
+class _CancelButton extends StatelessWidget {
+  const _CancelButton({this.onCancel});
+
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: () {
+        onCancel?.call();
+        Navigator.of(context).pop();
+      },
+      child: const Text('Cancel'),
+    );
+  }
+}
+
+/// Filled confirm — blood, with the blood glow shadow. Destructive/dramatic.
+class _BloodButton extends StatelessWidget {
+  const _BloodButton(
+    this.text, {
+    required this.onPressed,
+    this.padding,
+    this.fontSize,
+    this.shadowBlur = 18,
+    this.shadowOffsetY = 4,
+  });
+
+  final String text;
+  final VoidCallback onPressed;
+  final EdgeInsets? padding;
+  final double? fontSize;
+  final double shadowBlur;
+  final double shadowOffsetY;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: ImpColors.blood.withValues(alpha: .35),
+            blurRadius: shadowBlur,
+            offset: Offset(0, shadowOffsetY),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        style: ImpTheme.bloodButton(padding: padding, fontSize: fontSize),
+        onPressed: onPressed,
+        child: Text(text),
+      ),
+    );
+  }
+}
+
 class AddPlayerDialog extends StatelessWidget {
   AddPlayerDialog({super.key, required this.onAdd, required this.onCancel});
 
@@ -20,97 +88,24 @@ class AddPlayerDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-
     return AlertDialog(
       title: const Text('Add Player'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Enter name',
-              isDense: true, // ✅ reduces height
-              contentPadding: EdgeInsets.symmetric(
-                vertical: 10,
-                horizontal: 12,
-              ),
-            ),
-            onSubmitted: (_) => _submit(context),
-          ),
-        ],
-      ),
-      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      actions: [
-        Row(
-          children: [
-            Expanded(
-              child: TextButton(
-                onPressed: () {
-                  onCancel();
-                  Navigator.of(context).pop();
-                },
-                child: Text('Cancel', style: theme.bodyMedium),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => _submit(context),
-                child: const Text('Add'),
-              ),
-            ),
-          ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: TextField(
+          controller: _controller,
+          autofocus: true,
+          cursorColor: ImpColors.bone,
+          style: Theme.of(context).textTheme.bodyLarge,
+          decoration: const InputDecoration(hintText: 'Enter name'),
+          onSubmitted: (_) => _submit(context),
         ),
-      ],
-    );
-  }
-}
-
-class ShowWordDialog extends StatefulWidget {
-  const ShowWordDialog({super.key, required this.text, required this.playerName});
-  final String text;
-  final String playerName;
-
-  @override
-  State<ShowWordDialog> createState() => _ShowWordDialogState();
-}
-
-class _ShowWordDialogState extends State<ShowWordDialog> {
-  bool _revealed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    return Dialog.fullscreen(
-      child: GestureDetector(
-        onTap: _revealed ? null : () => setState(() => _revealed = true),
-        child: Container(
-          color: ImpColors.primaryColor,
-          child: Center(
-            child: _revealed
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(widget.text, style: theme.headlineLarge, textAlign: TextAlign.center),
-                      const SizedBox(height: 32),
-                      ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text("I've seen it"),
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(widget.playerName, style: theme.headlineMedium),
-                      const SizedBox(height: 24),
-                      Text('Tap to reveal', style: theme.headlineSmall),
-                    ],
-                  ),
-          ),
+      ),
+      actions: _actionRow(
+        cancel: _CancelButton(onCancel: onCancel),
+        confirm: ElevatedButton(
+          onPressed: () => _submit(context),
+          child: const Text('Add'),
         ),
       ),
     );
@@ -131,25 +126,135 @@ class RemovePlayerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Remove $playerName?'),
-      actions: [
-        Row(children: [
-          Expanded(child: TextButton(
-            onPressed: () { onCancel(); Navigator.of(context).pop(); },
-            child: const Text('Cancel'),
-          )),
-          const SizedBox(width: 12),
-          Expanded(child: ElevatedButton(
-            onPressed: () { onConfirm(); Navigator.of(context).pop(); },
-            child: const Text('Remove'),
-          )),
-        ]),
-      ],
+      title: SizedBox(
+        width: double.maxFinite,
+        child: Text('Remove $playerName?'),
+      ),
+      actions: _actionRow(
+        cancel: _CancelButton(onCancel: onCancel),
+        confirm: _BloodButton(
+          'Remove',
+          onPressed: () {
+            onConfirm();
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
     );
   }
 }
 
-class InsidiousImpostorRevealDialog extends StatefulWidget {
+/// Shared two-state full-screen reveal takeover: player name + "tap to
+/// reveal", then the secret content. Never dismissible from outside.
+class _RevealTakeover extends StatefulWidget {
+  const _RevealTakeover({
+    required this.playerName,
+    required this.vignetteOpacity,
+    required this.revealedBuilder,
+  });
+
+  final String playerName;
+  final double vignetteOpacity;
+  final WidgetBuilder revealedBuilder;
+
+  @override
+  State<_RevealTakeover> createState() => _RevealTakeoverState();
+}
+
+class _RevealTakeoverState extends State<_RevealTakeover> {
+  bool _revealed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+
+    return Dialog.fullscreen(
+      backgroundColor: ImpColors.voidBlack,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _revealed ? null : () => setState(() => _revealed = true),
+        child: Container(
+          decoration: ImpTheme.vignette(
+            opacity: widget.vignetteOpacity,
+            center: Alignment.center,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Center(
+            child: _revealed
+                ? widget.revealedBuilder(context)
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          widget.playerName,
+                          textAlign: TextAlign.center,
+                          style: theme.displayMedium,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      Text(
+                        'TAP TO REVEAL',
+                        style: theme.labelLarge?.copyWith(letterSpacing: 4),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ShowWordDialog extends StatelessWidget {
+  const ShowWordDialog({
+    super.key,
+    required this.text,
+    required this.playerName,
+  });
+  final String text;
+  final String playerName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+
+    return _RevealTakeover(
+      playerName: playerName,
+      vignetteOpacity: .1,
+      revealedBuilder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'YOUR WORD IS',
+            style: theme.labelLarge?.copyWith(fontSize: 18, letterSpacing: 4),
+          ),
+          const SizedBox(height: 26),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: theme.displayLarge?.copyWith(shadows: ImpTheme.glow()),
+            ),
+          ),
+          const SizedBox(height: 110),
+          _BloodButton(
+            "I've seen it",
+            fontSize: 20,
+            padding: const EdgeInsets.symmetric(horizontal: 46, vertical: 16),
+            shadowBlur: 24,
+            shadowOffsetY: 6,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class InsidiousImpostorRevealDialog extends StatelessWidget {
   const InsidiousImpostorRevealDialog({
     super.key,
     required this.playerName,
@@ -159,45 +264,46 @@ class InsidiousImpostorRevealDialog extends StatefulWidget {
   final VoidCallback onClose;
 
   @override
-  State<InsidiousImpostorRevealDialog> createState() => _InsidiousImpostorRevealDialogState();
-}
-
-class _InsidiousImpostorRevealDialogState extends State<InsidiousImpostorRevealDialog> {
-  bool _revealed = false;
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    return Dialog.fullscreen(
-      child: GestureDetector(
-        onTap: _revealed ? null : () => setState(() => _revealed = true),
-        child: Container(
-          color: ImpColors.primaryColor,
-          child: Center(
-            child: _revealed
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('You are', style: theme.headlineSmall),
-                      const SizedBox(height: 8),
-                      Text('the impostor', style: theme.headlineLarge, textAlign: TextAlign.center),
-                      const SizedBox(height: 40),
-                      ElevatedButton(
-                        onPressed: () { widget.onClose(); Navigator.of(context).pop(); },
-                        child: const Text("I've seen it"),
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(widget.playerName, style: theme.headlineMedium),
-                      const SizedBox(height: 24),
-                      Text('Tap to reveal', style: theme.headlineSmall),
-                    ],
-                  ),
+
+    return _RevealTakeover(
+      playerName: playerName,
+      vignetteOpacity: .16,
+      revealedBuilder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'You are',
+            style: theme.bodyLarge?.copyWith(
+              fontSize: 22,
+              fontStyle: FontStyle.italic,
+              color: ImpColors.ash,
+            ),
           ),
-        ),
+          const SizedBox(height: 20),
+          Text(
+            'the impostor',
+            textAlign: TextAlign.center,
+            style: theme.displayMedium?.copyWith(
+              fontSize: 46,
+              color: ImpColors.blood,
+              shadows: ImpTheme.glow(opacity: .5),
+            ),
+          ),
+          const SizedBox(height: 110),
+          _BloodButton(
+            "I've seen it",
+            fontSize: 20,
+            padding: const EdgeInsets.symmetric(horizontal: 46, vertical: 16),
+            shadowBlur: 24,
+            shadowOffsetY: 6,
+            onPressed: () {
+              onClose();
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
       ),
     );
   }
@@ -216,24 +322,27 @@ class ConfirmEliminationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Eliminate Player?'),
-      content: Text('Are you sure you want to eliminate $playerName?'),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: const Text('Cancel'),
+      title: SizedBox(
+        width: double.maxFinite,
+        child: Text(
+          'Eliminate Player?',
+          style: Theme.of(context)
+              .textTheme
+              .displaySmall
+              ?.copyWith(fontSize: 22),
         ),
-        ElevatedButton(
+      ),
+      content: Text('Are you sure you want to eliminate $playerName?'),
+      actions: _actionRow(
+        cancel: const _CancelButton(),
+        confirm: _BloodButton(
+          'Eliminate',
           onPressed: () {
             onConfirm();
             Navigator.of(context).pop();
           },
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          child: const Text('Eliminate'),
         ),
-      ],
+      ),
     );
   }
 }
@@ -248,25 +357,47 @@ class NonEndingEliminationDialog extends StatelessWidget {
     final theme = Theme.of(context).textTheme;
 
     return AlertDialog(
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            playerName,
-            style: theme.headlineMedium?.copyWith(color: Colors.black),
-          ),
-          const SizedBox(height: 16),
-          Text('is NOT the impostor', style: theme.bodyMedium),
-        ],
-      ),
-      actions: [
-        ElevatedButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: const Text('Continue'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                playerName,
+                textAlign: TextAlign.center,
+                style: theme.displaySmall?.copyWith(fontSize: 36),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text.rich(
+              TextSpan(
+                text: 'is ',
+                children: [
+                  TextSpan(
+                    text: 'NOT',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: ImpColors.blood,
+                    ),
+                  ),
+                  const TextSpan(text: ' the impostor'),
+                ],
+              ),
+              style: theme.bodyLarge?.copyWith(
+                fontSize: 20,
+                color: ImpColors.boneDim,
+              ),
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Continue'),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -289,35 +420,82 @@ class RoundResultDialog extends StatelessWidget {
       ..sort((a, b) => b.points.compareTo(a.points));
 
     return AlertDialog(
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, style: theme.headlineMedium?.copyWith(color: ImpColors.secondary), textAlign: TextAlign.center),
-          if (scorers.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 8),
-            ...scorers.map((p) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(p.name, style: theme.bodyMedium),
-                  Text('${p.points} pts', style: theme.bodyMedium),
-                ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.displaySmall?.copyWith(
+                color: ImpColors.blood,
+                shadows: ImpTheme.glow(),
               ),
-            )),
+            ),
+            if (scorers.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              ...scorers.map(
+                (p) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(p.name, style: theme.bodyLarge),
+                      const SizedBox(width: 8),
+                      const Expanded(child: _DottedLeader()),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${p.points} pts',
+                        style: theme.bodyMedium?.copyWith(fontSize: 17),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onDismiss();
+              },
+              child: const Text('Continue'),
+            ),
           ],
-        ],
-      ),
-      actions: [
-        ElevatedButton(
-          onPressed: () { Navigator.of(context).pop(); onDismiss(); },
-          child: const Text('Continue'),
         ),
-      ],
+      ),
     );
   }
+}
+
+/// Dotted scoreboard leader between name and points.
+class _DottedLeader extends StatelessWidget {
+  const _DottedLeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: CustomPaint(
+        size: const Size(double.infinity, 2),
+        painter: _DottedLinePainter(),
+      ),
+    );
+  }
+}
+
+class _DottedLinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = ImpColors.inputLine;
+    for (double x = 1; x < size.width; x += 5) {
+      canvas.drawCircle(Offset(x, size.height / 2), .9, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class QualityCheckDialog extends StatelessWidget {
@@ -333,50 +511,69 @@ class QualityCheckDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
     return AlertDialog(
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Good round?', style: theme.headlineSmall, textAlign: TextAlign.center),
-          const SizedBox(height: 32),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _KnifeButton(label: '🔪↑', onTap: () { Navigator.of(context).pop(); onGood(); }),
-              _KnifeButton(label: '🔪↓', onTap: () { Navigator.of(context).pop(); onBad(); }),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Text('Good', style: theme.labelMedium),
-              Text('Bad', style: theme.labelMedium),
-            ],
-          ),
-        ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Good round?',
+              textAlign: TextAlign.center,
+              style: theme.displaySmall?.copyWith(fontSize: 28),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _KnifeButton(
+                  asset: 'assets/art/knife-up.png',
+                  label: 'GOOD',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onGood();
+                  },
+                ),
+                const SizedBox(width: 36),
+                _KnifeButton(
+                  asset: 'assets/art/knife-down.png',
+                  label: 'BAD',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onBad();
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _KnifeButton extends StatelessWidget {
-  const _KnifeButton({required this.label, required this.onTap});
+  const _KnifeButton({
+    required this.asset,
+    required this.label,
+    required this.onTap,
+  });
+  final String asset;
   final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: ImpColors.tertiaryColor,
-          borderRadius: BorderRadius.circular(12),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Image.asset(asset, width: 96, height: 96),
         ),
-        child: Center(child: Text(label, style: const TextStyle(fontSize: 32))),
-      ),
+        const SizedBox(height: 10),
+        Text(label, style: Theme.of(context).textTheme.labelMedium),
+      ],
     );
   }
 }
@@ -393,20 +590,20 @@ class AbandonRoundDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Abandon this round?'),
-      actions: [
-        Row(children: [
-          Expanded(child: TextButton(
-            onPressed: () { onCancel(); Navigator.of(context).pop(); },
-            child: const Text('Cancel'),
-          )),
-          const SizedBox(width: 12),
-          Expanded(child: ElevatedButton(
-            onPressed: () { Navigator.of(context).pop(); onConfirm(); },
-            child: const Text('Abandon'),
-          )),
-        ]),
-      ],
+      title: const SizedBox(
+        width: double.maxFinite,
+        child: Text('Abandon this round?'),
+      ),
+      actions: _actionRow(
+        cancel: _CancelButton(onCancel: onCancel),
+        confirm: _BloodButton(
+          'Abandon',
+          onPressed: () {
+            Navigator.of(context).pop();
+            onConfirm();
+          },
+        ),
+      ),
     );
   }
 }
@@ -419,14 +616,37 @@ class GenerationErrorDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
     return AlertDialog(
-      content: Text('The fates are silent…\nTry again.', style: theme.bodyMedium, textAlign: TextAlign.center),
-      actions: [
-        ElevatedButton(
-          onPressed: () { Navigator.of(context).pop(); onRetry(); },
-          style: ElevatedButton.styleFrom(backgroundColor: ImpColors.accent),
-          child: const Text('Retry'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'The fates are silent…',
+              textAlign: TextAlign.center,
+              style: theme.displaySmall?.copyWith(fontSize: 22, height: 1.7),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Try again.',
+              style: theme.bodyLarge?.copyWith(
+                fontSize: 18,
+                fontStyle: FontStyle.italic,
+                color: ImpColors.ash,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _BloodButton(
+              'Retry',
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              onPressed: () {
+                Navigator.of(context).pop();
+                onRetry();
+              },
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

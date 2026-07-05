@@ -8,24 +8,36 @@ class AddPlayerDialogRequest extends DialogRequest {}
 class RemovePlayerDialogRequest extends DialogRequest {
   final String playerName;
   final int playerIndex;
-  RemovePlayerDialogRequest(this.playerName, this.playerIndex);
+  RemovePlayerDialogRequest({required this.playerName, required this.playerIndex});
 }
 
 class ShowWordDialogRequest extends DialogRequest {
   final String word;
-  final int index;
-  ShowWordDialogRequest(this.word, this.index);
+  final String playerName;
+  final int playerIndex;
+  ShowWordDialogRequest({
+    required this.word,
+    required this.playerName,
+    required this.playerIndex,
+  });
 }
 
 class InsidiousImpostorRevealDialogRequest extends DialogRequest {
+  final String playerName;
   final int playerIndex;
-  InsidiousImpostorRevealDialogRequest(this.playerIndex);
+  InsidiousImpostorRevealDialogRequest({
+    required this.playerName,
+    required this.playerIndex,
+  });
 }
 
 class ConfirmEliminationDialogRequest extends DialogRequest {
-  final int playerIndex;
   final String playerName;
-  ConfirmEliminationDialogRequest(this.playerName, this.playerIndex);
+  final int playerIndex;
+  ConfirmEliminationDialogRequest({
+    required this.playerName,
+    required this.playerIndex,
+  });
 }
 
 class NonEndingEliminationDialogRequest extends DialogRequest {
@@ -46,31 +58,27 @@ class GenerationErrorDialogRequest extends DialogRequest {}
 class AbandonRoundDialogRequest extends DialogRequest {}
 
 @immutable
-sealed class GameState {}
-
-final class GameInitial extends GameState {}
-
-final class GameInProgress extends GameState {
+class GameState {
   final List<Player> players;
   final GamePhase phase;
   final WordPair? wordPair;
   final DialogRequest? dialogRequest;
 
-  GameInProgress({
-    required this.players,
-    required this.phase,
+  const GameState({
+    this.players = const [],
+    this.phase = GamePhase.addingPlayers,
     this.wordPair,
     this.dialogRequest,
   });
 
-  GameInProgress copyWith({
+  GameState copyWith({
     List<Player>? players,
     GamePhase? phase,
     WordPair? wordPair,
     DialogRequest? dialogRequest,
     bool clearDialog = false,
   }) {
-    return GameInProgress(
+    return GameState(
       players: players ?? this.players,
       phase: phase ?? this.phase,
       wordPair: wordPair ?? this.wordPair,

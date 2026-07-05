@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Secrets / local run config — never commit the real API key
+dart_defines.json
+.env
+
+# Local Claude Code instructions
+CLAUDE.md
+docs/

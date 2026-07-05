@@ -1,107 +1,94 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:impostor/domain/model/game_phase.dart';
 import 'package:impostor/domain/model/player.dart';
 import 'package:impostor/domain/model/word_pair.dart';
+import 'package:impostor/domain/service/round_feedback_service.dart';
 import 'package:impostor/domain/service/word_service.dart';
-import 'package:flutter/foundation.dart';
 
 part 'game_state.dart';
 
 class GameCubit extends Cubit<GameState> {
   final bool isClueless;
   final WordService wordService;
+  final RoundFeedbackService roundFeedbackService;
 
   GameCubit({
     required this.isClueless,
     WordService? wordService,
+    RoundFeedbackService? roundFeedbackService,
   })  : wordService = wordService ?? GetIt.I<WordService>(),
-        super(GameInitial());
+        roundFeedbackService =
+            roundFeedbackService ?? GetIt.I<RoundFeedbackService>(),
+        super(const GameState());
 
   void showAddPlayerDialog() {
-    if (state is GameInitial) {
-      emit(GameInProgress(
-        players: [],
-        phase: GamePhase.addingPlayers,
-        dialogRequest: AddPlayerDialogRequest(),
-      ));
-    } else {
-      final current = state as GameInProgress;
-      emit(current.copyWith(dialogRequest: AddPlayerDialogRequest()));
-    }
+    if (state.phase != GamePhase.addingPlayers) return;
+    emit(state.copyWith(dialogRequest: AddPlayerDialogRequest()));
   }
 
   void addPlayer(String name) {
-    if (state is GameInitial) {
-      emit(GameInProgress(
-        players: [Player.firstCreate(name: name)],
-        phase: GamePhase.addingPlayers,
-      ));
-    } else if (state is GameInProgress) {
-      final current = state as GameInProgress;
-      final updatedPlayers = List<Player>.from(current.players)
-        ..add(Player.firstCreate(name: name));
-      emit(current.copyWith(players: updatedPlayers, clearDialog: true));
-    }
+    if (state.phase != GamePhase.addingPlayers) return;
+    emit(state.copyWith(
+      players: [...state.players, Player(name: name)],
+      clearDialog: true,
+    ));
   }
 
   void removePlayer(int index) {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
-    if (current.phase != GamePhase.addingPlayers) return;
-    final updatedPlayers = List<Player>.from(current.players)..removeAt(index);
-    emit(current.copyWith(players: updatedPlayers, clearDialog: true));
+    if (state.phase != GamePhase.addingPlayers) return;
+    emit(state.copyWith(
+      players: List<Player>.from(state.players)..removeAt(index),
+      clearDialog: true,
+    ));
   }
 
   void requestRemovePlayer(int index) {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
-    if (current.phase != GamePhase.addingPlayers) return;
-    emit(current.copyWith(
+    if (state.phase != GamePhase.addingPlayers) return;
+    emit(state.copyWith(
       dialogRequest: RemovePlayerDialogRequest(
-        current.players[index].name,
-        index,
+        playerName: state.players[index].name,
+        playerIndex: index,
       ),
     ));
   }
 
   void clearDialog() {
-    if (state is GameInProgress) {
-      final current = state as GameInProgress;
-      emit(current.copyWith(clearDialog: true));
-    }
+    emit(state.copyWith(clearDialog: true));
   }
 
   Future<void> startGame() async {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
+    emit(state.copyWith(phase: GamePhase.loading, clearDialog: true));
 
-    emit(current.copyWith(phase: GamePhase.loading, clearDialog: true));
-
-    late final WordPair wordPair;
+    final WordPair wordPair;
     try {
       wordPair = await wordService.generateWordPair();
     } catch (_) {
-      emit((state as GameInProgress).copyWith(
-        dialogRequest: GenerationErrorDialogRequest(),
-      ));
+      if (state.phase != GamePhase.loading) return;
+      emit(state.copyWith(dialogRequest: GenerationErrorDialogRequest()));
       return;
     }
 
-    final impostorIndex = Random().nextInt(current.players.length);
-    final updatedPlayers = current.players.asMap().entries.map((entry) {
-      final isImpostor = entry.key == impostorIndex;
-      return entry.value.copyWith(
-        word: isImpostor ? wordPair.impostorWord : wordPair.civilianWord,
-        isImpostor: isImpostor,
-        isEliminated: false,
-        hasSeenWord: false,
-      );
-    }).toList();
+    // Round may have been abandoned while the word pair was generating.
+    if (state.phase != GamePhase.loading) return;
 
-    emit(GameInProgress(
+    final impostorIndex = Random().nextInt(state.players.length);
+    final updatedPlayers = [
+      for (final (index, player) in state.players.indexed)
+        player.copyWith(
+          word: index == impostorIndex
+              ? wordPair.impostorWord
+              : wordPair.civilianWord,
+          isImpostor: index == impostorIndex,
+          isEliminated: false,
+          hasSeenWord: false,
+        ),
+    ];
+
+    emit(GameState(
       players: updatedPlayers,
       phase: GamePhase.dealingWords,
       wordPair: wordPair,
@@ -109,98 +96,95 @@ class GameCubit extends Cubit<GameState> {
   }
 
   void showWord(int index) {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
-    if (current.phase != GamePhase.dealingWords) return;
-    if (current.players[index].hasSeenWord) return;
-
-    final player = current.players[index];
+    if (state.phase != GamePhase.dealingWords) return;
+    final player = state.players[index];
+    if (player.hasSeenWord) return;
 
     if (!isClueless && player.isImpostor) {
-      emit(current.copyWith(
-        dialogRequest: InsidiousImpostorRevealDialogRequest(index),
+      emit(state.copyWith(
+        dialogRequest: InsidiousImpostorRevealDialogRequest(
+          playerName: player.name,
+          playerIndex: index,
+        ),
       ));
     } else {
-      emit(current.copyWith(
-        dialogRequest: ShowWordDialogRequest(player.word, index),
+      emit(state.copyWith(
+        dialogRequest: ShowWordDialogRequest(
+          word: player.word,
+          playerName: player.name,
+          playerIndex: index,
+        ),
       ));
     }
   }
 
   void confirmWordSeen(int playerIndex) {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
+    if (state.phase != GamePhase.dealingWords) return;
 
-    final updatedPlayers = List<Player>.from(current.players);
+    final updatedPlayers = List<Player>.from(state.players);
     updatedPlayers[playerIndex] =
         updatedPlayers[playerIndex].copyWith(hasSeenWord: true);
 
     final allSeen = updatedPlayers.every((p) => p.hasSeenWord);
 
-    emit(GameInProgress(
+    emit(GameState(
       players: updatedPlayers,
       phase: allSeen ? GamePhase.voting : GamePhase.dealingWords,
-      wordPair: current.wordPair,
+      wordPair: state.wordPair,
     ));
   }
 
   void requestElimination(int index) {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
-    if (current.phase != GamePhase.voting) return;
-    if (current.players[index].isEliminated) return;
+    if (state.phase != GamePhase.voting) return;
+    if (state.players[index].isEliminated) return;
 
-    emit(current.copyWith(
+    emit(state.copyWith(
       dialogRequest: ConfirmEliminationDialogRequest(
-        current.players[index].name,
-        index,
+        playerName: state.players[index].name,
+        playerIndex: index,
       ),
     ));
   }
 
   void confirmElimination(int index) {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
+    if (state.phase != GamePhase.voting) return;
 
-    final updatedPlayers = List<Player>.from(current.players);
-    updatedPlayers[index] =
-        updatedPlayers[index].copyWith(isEliminated: true);
+    final updatedPlayers = List<Player>.from(state.players);
+    updatedPlayers[index] = updatedPlayers[index].copyWith(isEliminated: true);
 
     final votedPlayer = updatedPlayers[index];
-    final activePlayers =
-        updatedPlayers.where((p) => !p.isEliminated).toList();
+    final activeCount = updatedPlayers.where((p) => !p.isEliminated).length;
 
     if (votedPlayer.isImpostor) {
-      emit(GameInProgress(
+      emit(GameState(
         players: updatedPlayers,
         phase: GamePhase.roundOver,
-        wordPair: current.wordPair,
+        wordPair: state.wordPair,
         dialogRequest: RoundResultDialogRequest(
           message: '${votedPlayer.name} was the impostor!',
           players: updatedPlayers,
         ),
       ));
-    } else if (activePlayers.length == 2) {
+    } else if (activeCount == 2) {
       final impostorIndex = updatedPlayers.indexWhere((p) => p.isImpostor);
-      final newPoints = updatedPlayers[impostorIndex].points + 1;
-      updatedPlayers[impostorIndex] =
-          updatedPlayers[impostorIndex].copyWith(points: newPoints);
-      final winner = updatedPlayers[impostorIndex];
+      final impostor = updatedPlayers[impostorIndex]
+          .copyWith(points: updatedPlayers[impostorIndex].points + 1);
+      updatedPlayers[impostorIndex] = impostor;
 
-      emit(GameInProgress(
+      emit(GameState(
         players: updatedPlayers,
         phase: GamePhase.roundOver,
-        wordPair: current.wordPair,
+        wordPair: state.wordPair,
         dialogRequest: RoundResultDialogRequest(
-          message: '${winner.name} wins this round!',
+          message: '${impostor.name} wins this round!',
           players: updatedPlayers,
         ),
       ));
     } else {
-      emit(GameInProgress(
+      emit(GameState(
         players: updatedPlayers,
         phase: GamePhase.voting,
-        wordPair: current.wordPair,
+        wordPair: state.wordPair,
         dialogRequest: NonEndingEliminationDialogRequest(
           playerName: votedPlayer.name,
         ),
@@ -209,20 +193,29 @@ class GameCubit extends Cubit<GameState> {
   }
 
   void dismissRoundResult() {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
-    emit(current.copyWith(dialogRequest: QualityCheckDialogRequest()));
+    emit(state.copyWith(dialogRequest: QualityCheckDialogRequest()));
   }
 
   void submitQualityCheck({required bool isGood}) {
-    // Plan 3: if isGood, write wordPair to Firebase
+    final wordPair = state.wordPair;
+    if (isGood && wordPair != null) {
+      // In Insidious mode the impostor never sees a word, so the pair is
+      // stored with the literal marker "impostor" instead.
+      final savedPair = isClueless
+          ? wordPair
+          : WordPair(civilianWord: wordPair.civilianWord, impostorWord: 'impostor');
+      roundFeedbackService
+          .saveApprovedWordPair(
+            wordPair: savedPair,
+            gameMode: isClueless ? 'clueless' : 'insidious',
+          )
+          .catchError((_) {});
+    }
     _resetToAddingPlayers();
   }
 
   void requestAbandonRound() {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
-    emit(current.copyWith(dialogRequest: AbandonRoundDialogRequest()));
+    emit(state.copyWith(dialogRequest: AbandonRoundDialogRequest()));
   }
 
   void abandonRound() {
@@ -230,19 +223,11 @@ class GameCubit extends Cubit<GameState> {
   }
 
   void _resetToAddingPlayers() {
-    if (state is! GameInProgress) return;
-    final current = state as GameInProgress;
-    final resetPlayers = current.players
-        .map((p) => p.copyWith(
-              word: '',
-              isImpostor: false,
-              isEliminated: false,
-              hasSeenWord: false,
-            ))
-        .toList();
-    emit(GameInProgress(
-      players: resetPlayers,
-      phase: GamePhase.addingPlayers,
+    emit(GameState(
+      players: [
+        for (final p in state.players)
+          Player(name: p.name, points: p.points),
+      ],
     ));
   }
 }
