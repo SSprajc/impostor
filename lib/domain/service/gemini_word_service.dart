@@ -93,4 +93,45 @@ class GeminiWordService implements WordService {
 
     return WordPair(civilianWord: civilianWord, impostorWord: impostorWord);
   }
+
+  // Same English word always maps to the same Croatian one, so the cache is
+  // never invalidated — later players tapping the same round word hit it.
+  final _translationCache = <String, String>{};
+
+  @override
+  Future<String> translateToCroatian(String word) async {
+    final cached = _translationCache[word.toLowerCase()];
+    if (cached != null) return cached;
+
+    final response = await _model.generateContent(
+      [
+        Content.text(
+          'Translate the English word "$word" into Croatian. '
+          'It is a common noun from a party game (categories like animals, '
+          'food, objects, professions). Give the single most natural '
+          'everyday Croatian term a native speaker would use — if the '
+          'English word is ambiguous, pick its most common noun meaning. '
+          'No explanations.\n\n'
+          'Respond with JSON: {"translation": "..."}',
+        ),
+      ],
+      generationConfig: GenerationConfig(
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+      ),
+    );
+
+    final text = response.text;
+    if (text == null) {
+      throw Exception('Gemini returned an empty response');
+    }
+
+    final json = jsonDecode(text) as Map<String, dynamic>;
+    final translation = json['translation'] as String?;
+    if (translation == null || translation.trim().isEmpty) {
+      throw Exception('Gemini response missing translation: $text');
+    }
+
+    return _translationCache[word.toLowerCase()] = translation.trim();
+  }
 }

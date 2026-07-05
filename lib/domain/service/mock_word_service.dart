@@ -6,4 +6,9 @@ class MockWordService implements WordService {
   Future<WordPair> generateWordPair() async {
     return const WordPair(civilianWord: 'Apple', impostorWord: 'Banana');
   }
+
+  @override
+  Future<String> translateToCroatian(String word) async {
+    return word == 'Apple' ? 'Jabuka' : 'Banana';
+  }
 }

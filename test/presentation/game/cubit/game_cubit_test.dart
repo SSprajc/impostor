@@ -23,6 +23,9 @@ class _ControlledWordService implements WordService {
 
   @override
   Future<WordPair> generateWordPair() => completer.future;
+
+  @override
+  Future<String> translateToCroatian(String word) async => word;
 }
 
 GameCubit _cubit({bool isClueless = true, WordService? wordService}) =>

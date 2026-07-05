@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:impostor/domain/model/player.dart';
+import 'package:impostor/domain/service/word_service.dart';
 import 'package:impostor/presentation/common/impostor_theme.dart';
 
 /// Right-aligned dialog action row: quiet cancel + filled confirm, gap 24.
@@ -207,7 +209,7 @@ class _RevealTakeoverState extends State<_RevealTakeover> {
   }
 }
 
-class ShowWordDialog extends StatelessWidget {
+class ShowWordDialog extends StatefulWidget {
   const ShowWordDialog({
     super.key,
     required this.text,
@@ -217,11 +219,46 @@ class ShowWordDialog extends StatelessWidget {
   final String playerName;
 
   @override
+  State<ShowWordDialog> createState() => _ShowWordDialogState();
+}
+
+class _ShowWordDialogState extends State<ShowWordDialog> {
+  String? _croatian;
+  bool _showCroatian = false;
+  bool _translating = false;
+
+  /// Display-only Croatian toggle; game state keeps the English word.
+  /// Fails silently — translation is a nicety, not a flow step.
+  Future<void> _onWordTap() async {
+    if (_croatian != null) {
+      setState(() => _showCroatian = !_showCroatian);
+      return;
+    }
+    if (_translating) return;
+
+    setState(() => _translating = true);
+    try {
+      final translation = await GetIt.I<WordService>()
+          .translateToCroatian(widget.text)
+          .timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      setState(() {
+        _croatian = translation;
+        _showCroatian = true;
+        _translating = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _translating = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
 
     return _RevealTakeover(
-      playerName: playerName,
+      playerName: widget.playerName,
       vignetteOpacity: .1,
       revealedBuilder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
@@ -231,12 +268,22 @@ class ShowWordDialog extends StatelessWidget {
             style: theme.labelLarge?.copyWith(fontSize: 18, letterSpacing: 4),
           ),
           const SizedBox(height: 26),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              text,
-              textAlign: TextAlign.center,
-              style: theme.displayLarge?.copyWith(shadows: ImpTheme.glow()),
+          GestureDetector(
+            onTap: _onWordTap,
+            child: AnimatedOpacity(
+              opacity: _translating ? .35 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  // Uppercased: Nosifer has Đ but no đ; caps keep every
+                  // Croatian glyph in-font (the face is all-caps anyway).
+                  _showCroatian ? _croatian!.toUpperCase() : widget.text,
+                  textAlign: TextAlign.center,
+                  style:
+                      theme.displayLarge?.copyWith(shadows: ImpTheme.glow()),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 110),
